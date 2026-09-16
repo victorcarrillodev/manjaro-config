@@ -345,6 +345,47 @@ install_dev_tools() {
             sudo usermod -aG docker "$USER"
             warn "  Te agregué al grupo docker. Cerrá sesión (o reiniciá) para poder usar 'docker' sin sudo."
         fi
+
+        # Docker es, de lejos, el que más escribe al disco (capas de imágenes,
+        # logs de contenedores). Topamos los logs y podamos semanalmente lo
+        # que ya no se usa, para no acumular basura en la USB sin límite.
+        if [[ ! -f /etc/docker/daemon.json ]]; then
+            sudo tee /etc/docker/daemon.json >/dev/null <<'EOF'
+{
+  "log-driver": "json-file",
+  "log-opts": { "max-size": "10m", "max-file": "3" }
+}
+EOF
+            sudo systemctl restart docker.service
+            log "  · Logs de contenedores acotados a 10MB x 3 archivos por contenedor."
+        else
+            log "  · /etc/docker/daemon.json ya existe, no lo toco."
+        fi
+
+        sudo tee /etc/systemd/system/docker-prune.service >/dev/null <<'EOF'
+[Unit]
+Description=Limpieza semanal de recursos de Docker sin usar
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/docker system prune -f
+EOF
+        sudo tee /etc/systemd/system/docker-prune.timer >/dev/null <<'EOF'
+[Unit]
+Description=Corre docker-prune.service semanalmente
+
+[Timer]
+OnCalendar=weekly
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+        sudo systemctl daemon-reload
+        sudo systemctl enable --now docker-prune.timer
+        log "  · docker-prune.timer activo (poda semanal de imágenes/contenedores sin usar)."
     fi
 
     install_aur flutter-bin
@@ -355,6 +396,29 @@ install_dev_tools() {
         log "  · Instalando Rust vía rustup..."
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
         command -v "$HOME/.cargo/bin/rustup" &>/dev/null || fail "  rustup no quedó instalado."
+    fi
+
+    # Si /tmp es tmpfs (RAM) — el default en este Manjaro — mandamos ahí los
+    # artefactos de compilación de cargo: son descartables, se regeneran solos
+    # y así ni pesan ni desgastan la USB, y compilan bastante más rápido.
+    if [[ "$(findmnt -no FSTYPE /tmp 2>/dev/null)" == "tmpfs" ]]; then
+        local cargo_config="$HOME/.cargo/config.toml"
+        mkdir -p "$HOME/.cargo"
+        if [[ -f "$cargo_config" ]] && grep -q 'target-dir' "$cargo_config" 2>/dev/null; then
+            log "  · target-dir de cargo ya está configurado."
+        elif [[ -f "$cargo_config" ]] && grep -q '^\[build\]' "$cargo_config" 2>/dev/null; then
+            warn "  ~/.cargo/config.toml ya tiene una sección [build]; no la toco."
+            warn "  Agregale 'target-dir = \"/tmp/cargo-target\"' a mano si querés compilar en RAM."
+        else
+            cat >> "$cargo_config" <<'EOF'
+
+[build]
+# /tmp es tmpfs (RAM) en este sistema: compilar ahí es más rápido y no
+# desgasta la USB. Se pierde el caché incremental al reiniciar, no pasa nada.
+target-dir = "/tmp/cargo-target"
+EOF
+            log "  · cargo va a compilar en /tmp (RAM) en vez de en la USB."
+        fi
     fi
 }
 
