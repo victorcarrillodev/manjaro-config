@@ -323,6 +323,22 @@ install_dev_tools() {
     install_pkg nodejs
     install_pkg npm
 
+    if command -v pnpm &>/dev/null; then
+        log "  · pnpm ya está instalado."
+    else
+        log "  · Instalando pnpm..."
+        curl -fsSL https://get.pnpm.io/install.sh | sh -
+        command -v "$HOME/.local/share/pnpm/pnpm" &>/dev/null || fail "  pnpm no quedó instalado."
+    fi
+
+    if command -v bun &>/dev/null; then
+        log "  · bun ya está instalado."
+    else
+        log "  · Instalando bun..."
+        curl -fsSL https://bun.sh/install | bash
+        command -v "$HOME/.bun/bin/bun" &>/dev/null || fail "  bun no quedó instalado."
+    fi
+
     if install_pkg docker; then
         sudo systemctl enable --now docker.service || fail "  No se pudo habilitar el servicio docker."
         if ! id -nG "$USER" | tr ' ' '\n' | grep -qx docker; then
@@ -428,8 +444,9 @@ print_summary() {
 Pendientes que necesitan una acción tuya:
   · Docker: si te acaba de agregar al grupo docker, cerrá sesión y volvé a
     entrar (o reiniciá) antes de usar 'docker' sin sudo.
-  · Rust: abrí una terminal nueva (o corré 'source ~/.cargo/env') para que
-    'cargo'/'rustc' aparezcan en el PATH.
+  · Rust, pnpm y bun: abrí una terminal nueva (sus instaladores agregan el
+    PATH al perfil de shell) para que 'cargo'/'rustc', 'pnpm' y 'bun'
+    aparezcan disponibles.
   · Antigravity IDE/CLI, Claude Code (CLI/desktop) y opencode piden iniciar
     sesión con tu cuenta la primera vez que los abras.
   · Hay una campaña activa de paquetes AUR comprometidos (2026): si no
@@ -467,7 +484,7 @@ main() {
     sudo pacman -Syu --noconfirm
     install_yay
 
-    step "Herramientas de desarrollo: git, Node.js, Docker, Flutter, Rust"
+    step "Herramientas de desarrollo: git, Node.js, pnpm, bun, Docker, Flutter, Rust"
     install_dev_tools
 
     step "Editores e IDEs: Cursor, Antigravity IDE"
