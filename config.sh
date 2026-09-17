@@ -465,6 +465,13 @@ install_ai_tools() {
     fi
 }
 
+install_tailscale() {
+    if install_pkg tailscale; then
+        sudo systemctl enable --now tailscaled.service || fail "  No se pudo habilitar el servicio tailscaled."
+        log "  · Corré 'sudo tailscale up' para conectar este equipo a tu tailnet."
+    fi
+}
+
 install_browsers() {
     install_aur brave-nightly-bin
     install_aur google-chrome
@@ -513,6 +520,8 @@ Pendientes que necesitan una acción tuya:
     aparezcan disponibles.
   · Antigravity IDE/CLI, Claude Code (CLI/desktop) y opencode piden iniciar
     sesión con tu cuenta la primera vez que los abras.
+  · Tailscale: corré 'sudo tailscale up' para conectar este equipo a tu
+    tailnet (te va a pedir autenticarte la primera vez).
   · Hay una campaña activa de paquetes AUR comprometidos (2026): si no
     llegaste a revisar algún PKGBUILD que yay te mostró, dale una repasada
     antes de confiar ciegamente en el resultado.
@@ -559,6 +568,9 @@ main() {
 
     step "WhatsApp Desktop (ZapZap)"
     install_aur zapzap
+
+    step "Tailscale (VPN mesh)"
+    install_tailscale
 
     step "Navegadores: Brave Nightly + Google Chrome (fuera Firefox)"
     install_browsers
