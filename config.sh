@@ -35,7 +35,6 @@ skip_msg() {
 # ===========================================================================
 optimize_system_performance() {
     echo "Aplicando optimizaciones para USB (reduciendo escrituras en disco)..."
-    # Reducir el uso de la swap y caché para prolongar la vida de la USB
     sudo sysctl -w vm.swappiness=10
     sudo sysctl -w vm.vfs_cache_pressure=50
     echo "Optimizaciones temporales aplicadas."
@@ -70,16 +69,18 @@ install_dev_tools() {
     echo -n "Bun: "
     if ! command -v bun &> /dev/null; then yay -S --noconfirm bun-bin; else skip_msg; fi
 
-    # Docker
+    # Docker (con corrección de permisos)
     echo -n "Docker: "
     if ! command -v docker &> /dev/null; then 
         sudo pacman -S --noconfirm docker docker-compose
         sudo systemctl enable --now docker
+        sudo usermod -aG docker "$USER"
+        echo -e "${GREEN} Instalado (se requiere reiniciar sesión para aplicar permisos)${NC}"
     else 
         skip_msg
     fi
 
-    # Flutter (Versión binaria precompilada para evitar problemas de dependencias con Dart)
+    # Flutter
     echo -n "Flutter: "
     if ! command -v flutter &> /dev/null; then yay -S --noconfirm flutter-bin; else skip_msg; fi
 
@@ -102,6 +103,9 @@ install_editors() {
 }
 
 install_ai_tools() {
+    echo -n "Claude Desktop: "
+    if ! command -v claude-desktop &> /dev/null; then yay -S --noconfirm claude-desktop-bin; else skip_msg; fi
+
     echo -n "Claude Code CLI: "
     if ! command -v claude &> /dev/null; then sudo npm install -g @anthropic-ai/claude-code; else skip_msg; fi
 
@@ -153,6 +157,7 @@ cleanup_residuals() {
 print_summary() {
     echo -e "\n${CYAN}===========================================${NC}"
     echo -e "${GREEN}¡Configuración e instalación completadas!${NC}"
+    echo -e "${YELLOW}Nota: Es posible que necesites cerrar y abrir sesión para que Docker funcione sin sudo.${NC}"
     echo -e "${CYAN}===========================================${NC}\n"
 }
 
@@ -232,7 +237,7 @@ main() {
     step "Editores e IDEs: Cursor, Antigravity IDE"
     install_editors
 
-    step "Herramientas de IA: Claude Code CLI, Antigravity CLI, opencode"
+    step "Herramientas de IA: Claude Desktop, Claude Code CLI, Antigravity CLI, opencode"
     install_ai_tools
 
     step "WhatsApp Desktop (WhatsDesk)"
