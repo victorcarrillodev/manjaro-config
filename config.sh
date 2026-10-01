@@ -15,7 +15,7 @@ INSTALL_MODE=""
 # ===========================================================================
 if [ "$EUID" -eq 0 ]; then
   echo -e "${RED}ERROR: Por favor, NO ejecutes este script como root ni uses 'sudo ./config.sh'.${NC}"
-  echo -e "Ejecútalo como tu usuario normal (ej. ${CYAN}bash config.sh${NC}). El script te pedirá tu contraseña de sudo cuando sea necesario."
+  echo -e "Ejecútalo como tu usuario normal (ej. ${CYAN}bash config.sh${NC})."
   echo "Yay fallará si se ejecuta como root."
   exit 1
 fi
@@ -43,7 +43,7 @@ skip_msg() {
 }
 
 # ===========================================================================
-# Funciones de Instalación (Con validación)
+# Funciones de Instalación
 # ===========================================================================
 optimize_system_performance() {
     echo "Aplicando optimizaciones para USB (reduciendo escrituras en disco)..."
@@ -57,9 +57,9 @@ install_yay() {
         echo "Instalando dependencias base y yay..."
         sudo pacman -S --needed --noconfirm base-devel git
         
-        # En Manjaro, yay está en los repositorios oficiales
+        # Instalar desde repositorios oficiales de Manjaro
         if sudo pacman -S --needed --noconfirm yay; then
-            echo "yay instalado correctamente desde los repositorios de Manjaro."
+            echo "yay instalado correctamente."
         else
             echo "Fallo al instalar yay desde pacman. Intentando compilar desde AUR..."
             git clone https://aur.archlinux.org/yay.git /tmp/yay
@@ -118,18 +118,26 @@ install_editors() {
     if ! command -v cursor &> /dev/null; then yay -S --needed --noconfirm cursor-bin; else skip_msg; fi
 
     echo -n "Antigravity IDE: "
-    if ! command -v antigravity-ide &> /dev/null; then yay -S --needed --noconfirm antigravity-ide-bin || echo "Requiere instalación manual."; else skip_msg; fi
+    if ! command -v antigravity-ide &> /dev/null; then 
+        yay -S --needed --noconfirm antigravity-ide-bin || yay -S --needed --noconfirm antigravity-ide || yay -S --needed --noconfirm antigravity-bin
+    else 
+        skip_msg
+    fi
 }
 
 install_ai_tools() {
-    echo -n "Claude Desktop (Oficial): "
-    if ! command -v claude-desktop &> /dev/null; then yay -S --needed --noconfirm claude-desktop; else skip_msg; fi
+    echo -n "Claude Desktop: "
+    if ! command -v claude-desktop &> /dev/null; then 
+        yay -S --needed --noconfirm claude-desktop-bin || yay -S --needed --noconfirm claude-desktop
+    else 
+        skip_msg
+    fi
 
     echo -n "Claude Code CLI: "
     if ! command -v claude &> /dev/null; then sudo npm install -g @anthropic-ai/claude-code; else skip_msg; fi
 
     echo -n "Antigravity CLI: "
-    if ! command -v antigravity &> /dev/null; then sudo npm install -g @antigravity/cli || echo "Paquete npm no encontrado."; else skip_msg; fi
+    if ! command -v antigravity &> /dev/null; then sudo npm install -g @antigravity/cli; else skip_msg; fi
 
     echo -n "Opencode: "
     if ! command -v opencode &> /dev/null; then yay -S --needed --noconfirm opencode-bin || sudo npm install -g opencode; else skip_msg; fi
