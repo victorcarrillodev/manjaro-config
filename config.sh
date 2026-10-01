@@ -6,17 +6,29 @@
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
 YELLOW='\033[1;33m'
+RED='\033[0;31m'
 NC='\033[0m' # No Color
 INSTALL_MODE=""
+
+# ===========================================================================
+# Prevención de ejecución como Root (CRÍTICO PARA YAY/AUR)
+# ===========================================================================
+if [ "$EUID" -eq 0 ]; then
+  echo -e "${RED}ERROR: Por favor, NO ejecutes este script como root ni uses 'sudo ./config.sh'.${NC}"
+  echo -e "Ejecútalo como tu usuario normal (ej. ${CYAN}bash config.sh${NC}). El script te pedirá tu contraseña de sudo cuando sea necesario."
+  echo "Yay fallará si se ejecuta como root."
+  exit 1
+fi
 
 # ===========================================================================
 # Funciones Auxiliares
 # ===========================================================================
 print_banner() {
-    echo -e "${CYAN}=== Script de Instalación y Configuración ===${NC}"
+    echo -e "${CYAN}=== Script de Instalación y Configuración (Manjaro Edition) ===${NC}"
 }
 
 request_sudo() {
+    echo -e "${YELLOW}Solicitando permisos de administrador para la instalación...${NC}"
     sudo -v
     # Mantener el sudo vivo mientras el script se ejecuta
     while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
@@ -44,9 +56,16 @@ install_yay() {
     if ! command -v yay &> /dev/null; then
         echo "Instalando dependencias base y yay..."
         sudo pacman -S --needed --noconfirm base-devel git
-        git clone https://aur.archlinux.org/yay.git /tmp/yay
-        cd /tmp/yay && makepkg -si --noconfirm
-        cd - && rm -rf /tmp/yay
+        
+        # En Manjaro, yay está en los repositorios oficiales
+        if sudo pacman -S --needed --noconfirm yay; then
+            echo "yay instalado correctamente desde los repositorios de Manjaro."
+        else
+            echo "Fallo al instalar yay desde pacman. Intentando compilar desde AUR..."
+            git clone https://aur.archlinux.org/yay.git /tmp/yay
+            cd /tmp/yay && makepkg -si --noconfirm
+            cd - && rm -rf /tmp/yay
+        fi
     else
         skip_msg
     fi
@@ -55,24 +74,24 @@ install_yay() {
 install_dev_tools() {
     # Git
     echo -n "Git: "
-    if ! command -v git &> /dev/null; then sudo pacman -S --noconfirm git; else skip_msg; fi
+    if ! command -v git &> /dev/null; then sudo pacman -S --needed --noconfirm git; else skip_msg; fi
 
     # Node.js y npm
     echo -n "Node.js: "
-    if ! command -v node &> /dev/null; then sudo pacman -S --noconfirm nodejs npm; else skip_msg; fi
+    if ! command -v node &> /dev/null; then sudo pacman -S --needed --noconfirm nodejs npm; else skip_msg; fi
 
     # PNPM
     echo -n "pnpm: "
-    if ! command -v pnpm &> /dev/null; then sudo pacman -S --noconfirm pnpm; else skip_msg; fi
+    if ! command -v pnpm &> /dev/null; then sudo pacman -S --needed --noconfirm pnpm; else skip_msg; fi
 
     # Bun
     echo -n "Bun: "
-    if ! command -v bun &> /dev/null; then yay -S --noconfirm bun-bin; else skip_msg; fi
+    if ! command -v bun &> /dev/null; then yay -S --needed --noconfirm bun-bin; else skip_msg; fi
 
-    # Docker (con corrección de permisos)
+    # Docker
     echo -n "Docker: "
     if ! command -v docker &> /dev/null; then 
-        sudo pacman -S --noconfirm docker docker-compose
+        sudo pacman -S --needed --noconfirm docker docker-compose
         sudo systemctl enable --now docker
         sudo usermod -aG docker "$USER"
         echo -e "${GREEN} Instalado (se requiere reiniciar sesión para aplicar permisos)${NC}"
@@ -82,12 +101,12 @@ install_dev_tools() {
 
     # Flutter
     echo -n "Flutter: "
-    if ! command -v flutter &> /dev/null; then yay -S --noconfirm flutter-bin; else skip_msg; fi
+    if ! command -v flutter &> /dev/null; then yay -S --needed --noconfirm flutter-bin; else skip_msg; fi
 
     # Rust
     echo -n "Rust: "
     if ! command -v rustc &> /dev/null; then 
-        sudo pacman -S --noconfirm rustup
+        sudo pacman -S --needed --noconfirm rustup
         rustup default stable
     else 
         skip_msg
@@ -96,35 +115,35 @@ install_dev_tools() {
 
 install_editors() {
     echo -n "Cursor IDE: "
-    if ! command -v cursor &> /dev/null; then yay -S --noconfirm cursor-bin; else skip_msg; fi
+    if ! command -v cursor &> /dev/null; then yay -S --needed --noconfirm cursor-bin; else skip_msg; fi
 
     echo -n "Antigravity IDE: "
-    if ! pacman -Qs antigravity-ide &> /dev/null; then yay -S --noconfirm antigravity-ide-bin || echo "No se encontró paquete oficial en AUR, requiere instalación manual."; else skip_msg; fi
+    if ! command -v antigravity-ide &> /dev/null; then yay -S --needed --noconfirm antigravity-ide-bin || echo "Requiere instalación manual."; else skip_msg; fi
 }
 
 install_ai_tools() {
-    echo -n "Claude Desktop: "
-    if ! command -v claude-desktop &> /dev/null; then yay -S --noconfirm claude-desktop-bin; else skip_msg; fi
+    echo -n "Claude Desktop (Oficial): "
+    if ! command -v claude-desktop &> /dev/null; then yay -S --needed --noconfirm claude-desktop; else skip_msg; fi
 
     echo -n "Claude Code CLI: "
     if ! command -v claude &> /dev/null; then sudo npm install -g @anthropic-ai/claude-code; else skip_msg; fi
 
     echo -n "Antigravity CLI: "
-    if ! command -v antigravity &> /dev/null; then sudo npm install -g @antigravity/cli || echo "Paquete npm no encontrado, revisar nombre exacto."; else skip_msg; fi
+    if ! command -v antigravity &> /dev/null; then sudo npm install -g @antigravity/cli || echo "Paquete npm no encontrado."; else skip_msg; fi
 
     echo -n "Opencode: "
-    if ! command -v opencode &> /dev/null; then yay -S --noconfirm opencode-bin || sudo npm install -g opencode; else skip_msg; fi
+    if ! command -v opencode &> /dev/null; then yay -S --needed --noconfirm opencode-bin || sudo npm install -g opencode; else skip_msg; fi
 }
 
 install_whatsapp() {
     echo -n "WhatsDesk (WhatsApp): "
-    if ! command -v whatsdesk &> /dev/null; then yay -S --noconfirm whatsdesk-bin; else skip_msg; fi
+    if ! command -v whatsdesk &> /dev/null; then yay -S --needed --noconfirm whatsdesk-bin; else skip_msg; fi
 }
 
 install_tailscale() {
     echo -n "Tailscale: "
     if ! command -v tailscale &> /dev/null; then 
-        sudo pacman -S --noconfirm tailscale
+        sudo pacman -S --needed --noconfirm tailscale
         sudo systemctl enable --now tailscaled
     else 
         skip_msg
@@ -133,10 +152,10 @@ install_tailscale() {
 
 install_browsers() {
     echo -n "Brave Nightly: "
-    if ! command -v brave-nightly &> /dev/null; then yay -S --noconfirm brave-nightly-bin; else skip_msg; fi
+    if ! command -v brave-nightly &> /dev/null; then yay -S --needed --noconfirm brave-nightly-bin; else skip_msg; fi
 
     echo -n "Google Chrome: "
-    if ! command -v google-chrome-stable &> /dev/null; then yay -S --noconfirm google-chrome; else skip_msg; fi
+    if ! command -v google-chrome-stable &> /dev/null; then yay -S --needed --noconfirm google-chrome; else skip_msg; fi
 
     echo -n "Eliminando Firefox: "
     if pacman -Qs firefox &> /dev/null; then 
@@ -156,8 +175,8 @@ cleanup_residuals() {
 
 print_summary() {
     echo -e "\n${CYAN}===========================================${NC}"
-    echo -e "${GREEN}¡Configuración e instalación completadas!${NC}"
-    echo -e "${YELLOW}Nota: Es posible que necesites cerrar y abrir sesión para que Docker funcione sin sudo.${NC}"
+    echo -e "${GREEN}¡Configuración e instalación completadas para Manjaro!${NC}"
+    echo -e "${YELLOW}Nota: Por favor cierra sesión y vuelve a entrar para que Docker funcione sin sudo.${NC}"
     echo -e "${CYAN}===========================================${NC}\n"
 }
 
